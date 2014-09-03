@@ -1,0 +1,105 @@
+
+
+#+TITLE: MME Node
+#+CATEGORY: SmallCells
+
+* EPC Acchitecture
+  [[file:epc-architecture.png]]
+
+* MME Mobility-Management Entity
+  - Track UE's via tracking area
+  - Call processing
+
+** Functions
+*** Network access control functions  
+    Network access is the means by which a user is connected to the evolved packet core system
+**** Network/Access network selection  
+     UE selects a PLMN/Access network from which to gain IP connectivity
+**** Authentication and authorisation function  
+     - ref. MMF
+**** Admission control function  
+**** Policy and Charging Enforcement Function  
+     - PCEF as defined by TS 23.203
+**** Lawful Interception  
+*** Packet routing and transfer functions  
+    The EPS is an IP network and uses the standard routing and transport mechanisms of the underlying IP network. 
+**** IP header compression function       
+**** Packet screening function  
+*** Security functions      
+**** Ciphering function  
+**** Integrity protection function  
+*** Mobility management functions  
+    The mobility management functions are used to keep track of the current location of a UE
+**** Reachability Management for UE in ECM-IDLE state  
+     An EMM-REGISTERED UE performs periodic Tracking Area Updates with
+     the network after the expiry of the periodic TAU timer
+**** Tracking Area list management  
+**** Inter-eNodeB mobility anchor function  
+**** Inter-GPP mobility anchor function  
+**** Idle mode signalling reduction function  
+**** Mobility Restrictions 
+**** IMS voice over PS Session Supported Indication  
+*** Radio Resource Management functions  
+    Index to RAT/Frequency Selection Priority, RFSP Index value to the
+    eNB across S1. The S1 messages that transfer the RFSP Index to the
+    eNodeB are specified in TS 36.413
+*** Network management functions  
+**** Load balancing between MMEs  
+**** Load re-balancing between MMEs  
+**** MME control of overload  
+*** Selection functions  
+**** PDN GW selection function (GPP accesses)  
+**** Serving GW selection function  
+**** MME selection function  
+**** SGSN selection function  
+**** Selection of PCRF  
+*** IP network related functions  
+**** Domain Name Service function  
+**** DHCP function
+
+** Modules
+*** EMM (Evolved Mobility Management)
+    - Talk to S-GW to select P-GW for UE
+*** ESM (Evolved Session Management)
+    - RRC
+
+* HSS Home Subscriber Server
+** Subscriber Database
+   - Last Located MME
+   - Authentication 
+   - Authorising policy
+
+* S-Gw Serving Gataway
+  - Anchor the user
+  - Act ass MiddleMan for signaling between P-GW and MME
+  - Handle IP packets between P-GW and eNodeB
+  - IP router with support of GTP (eNodeB and P-GW)
+  - Cherging
+  - Rouming S8/S5
+
+* P-GW PDN Gateaway
+  - Anchor PDN
+  - Policy Control Enforcement Function
+    - QOS controll (talk to PCRF)
+  - IP router for GTP and Diameter
+
+
+* PDN
+
+* org-config                                                        :ARCHIVE:
+#+STARTUP: content hidestars logdone
+#+TAGS: DOCS(d) CODING(c) TESTING(t) PLANING(p)
+#+LINK_UP: sitemap.html
+#+LINK_HOME: main.html
+#+COMMENT: toc:nil
+#+OPTIONS: ^:nil
+#+OPTIONS:   H:3 num:t toc:t \n:nil @:t ::t |:t ^:nil -:t f:t *:t <:t
+#+OPTIONS:   TeX:t LaTeX:t skip:nil d:nil todo:t pri:nil tags:not-in-toc
+#+DESCRIPTION: Augment design process with system property discovering aid.
+#+KEYWORDS: SmallCell,
+#+LANGUAGE: en
+#+PROPERTY: Effort_ALL  1:00 2:00 4:00 6:00 8:00 12:00
+#+COLUMNS: %38ITEM(Details) %TAGS(Context) %7TODO(To Do) %5Effort(Time){:} %6CLOCKSUM{Total}
+
+#+STYLE: <link rel="stylesheet" type="text/css" href="org-manual.css" />
+
