@@ -5,8 +5,11 @@
 
 * Testing and coding
 
-** TODO Recover FSM testig and design
-
+** TODO Recover FSM testig and design [0/3]
+   - [ ] proper
+   - [ ] blue-fring
+   - [ ] FSM test framework
+     
 *** Propper into dependenties
 
 *** Blue fringe (maybe)
