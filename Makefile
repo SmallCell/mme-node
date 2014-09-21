@@ -19,7 +19,7 @@ deps:
 
 clean:
 	$(REBAR) clean
-	-@rm -rf .eunit/*.beam erl_crash.dump
+	-@rm -rf .eunit/*.beam erl_crash.dump ebin/*.beam
 	-@rm -f *_fsm.beam *_fsm.dot *_fsm.erl *_fsm.jpeg
 	-@rm -f *_eqc.beam *_eqc.dot *_eqc.erl *_eqc.jpg
 
@@ -35,7 +35,7 @@ SUT ?= tradepost
 SUITE=$(SUT)_tests
 FSM_DYNAMIC=ebin/fsm_dynamic
 
-ERLANG_PATH=-pa apps/*/ebin -pa deps/*/ebin -pa .eunit -pa ebin
+ERLANG_PATH=-pa apps/*/ebin -pa deps/*/ebin -pa ebin
 ERLANG_INCLUDE=-I include
 BINDIR=ebin
 
@@ -43,11 +43,14 @@ test: all
 	@mkdir -p .eunit
 	$(REBAR) skip_deps=true eunit
 
+shell:
+	exec erl ${ERLANG_PATH} -boot start_sasl -s mme
+
 eunit:
 	$(REBAR) -v eunit skip_deps=true suites=$(SUITE)
 
 eunit-shell:
-	exec erl ${ERLANG_PATH} -boot start_sasl
+	exec erl ${ERLANG_PATH} -pa .eunit -boot start_sasl
 
 vztest:
 	erlc ${ERLANG_INCLUDE} -DTEST -o ${BINDIR} test/${SUITE}.erl
