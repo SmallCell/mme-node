@@ -31,10 +31,6 @@ docs:
 	@erl -noshell -run edoc_run application '$(APP)' '"."' '[]'
 
 ##################################################################
-SUT ?= tradepost
-SUITE=$(SUT)_tests
-FSM_DYNAMIC=ebin/fsm_dynamic
-
 ERLANG_PATH=-pa apps/*/ebin -pa deps/*/ebin -pa ebin
 ERLANG_INCLUDE=-I include
 BINDIR=ebin
@@ -46,11 +42,23 @@ test: all
 shell:
 	exec erl ${ERLANG_PATH} -boot start_sasl -s mme
 
+ct_run:
+	./rebar -v ct skip_deps=true suites=mme_transport skip_apps=emm,esm,rrc
+
+# ct_run -dir apps/mme/test/ -suite mme_transport_SUITE
+
+##################################################################
 eunit:
-	$(REBAR) -v eunit skip_deps=true suites=$(SUITE)
+	$(REBAR) -v eunit skip_deps=true
 
 eunit-shell:
 	exec erl ${ERLANG_PATH} -pa .eunit -boot start_sasl
+
+##################################################################
+SUT ?= tradepost
+SUITE=$(SUT)_tests
+FSM_DYNAMIC=ebin/fsm_dynamic
+
 
 vztest:
 	erlc ${ERLANG_INCLUDE} -DTEST -o ${BINDIR} test/${SUITE}.erl
