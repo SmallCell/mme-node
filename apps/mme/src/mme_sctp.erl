@@ -19,8 +19,46 @@
 
 -define(SERVER, ?MODULE).
 
+%% The default port for a listener.
+-define(DEFAULT_PORT, 36412).
+
+%% How long a listener with no associations lives before offing
+%% itself.
+-define(LISTENER_TIMEOUT, 30000).
+
+%% How long to wait for a transport process to attach after
+%% association establishment.
+-define(ACCEPT_TIMEOUT, 5000).
+
 -record(state, {}).
 
+-type listen_option() :: {accept, inet:ip_address()}.
+
+-type uint() :: non_neg_integer().
+
+%% Accepting/connecting transport process state.
+-record(transport,
+        {parent  :: pid(),
+         socket   :: gen_sctp:sctp_socket(),
+         assoc_id :: gen_sctp:assoc_id(),  %% association identifier
+         peer     :: {[inet:ip_address()], uint()}, %% {RAs, RP}
+         streams  :: {uint(), uint()},     %% {InStream, OutStream} counts
+         os = 0   :: uint()}).             %% next output stream
+
+%% Listener process state.
+-record(listener,
+        {ref       :: reference(),
+         socket    :: gen_sctp:sctp_socket(),
+         count = 0 :: uint(),
+         tmap = ets:new(?MODULE, []) :: ets:tid(),
+         %% {MRef, Pid|AssocId}, {AssocId, Pid} Field tmap is used to
+         %% map an incoming message or event to the relevent transport
+         %% process.
+         pending = {0, ets:new(?MODULE, [ordered_set])},
+         %% Field pending implements a queue of transport processes to
+         %% which an association has been assigned.
+         tref      :: reference()}).
+                         
 %%%===================================================================
 %%% API
 %%%===================================================================

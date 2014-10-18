@@ -59,17 +59,26 @@ all() ->
      stop].
 
 start(_Config) ->
-    %% {ok, _} = nano_trace:start([?MODULE]),
-    ok = mme:start().
+    {ok, _} = nano_trace:start([mme], "/tmp/mme.trace"),
+    ok = mme:start(),
+    nano_trace:add_app(mme),
+    nano_trace:add_app(?MODULE),
+    nano_trace:filter(allF),
+    ct:print(">> ~p\n", [nano_trace:print_applications()]),
+
+    ok.
+    
 
 stop(_Config) ->
-    ok = mme:stop().
+    ok = mme:stop(),
+    nano_trace:stop().    
 
 
 %%--------------------------------------------------------------------
 sctp_connect(_Config) ->
     %% Connect, send a message and receive it back.
     {ok, Sock} = gen_connect(?DEFAULT_PORT),
+
     Bin = make_msg(),
     ok = gen_send(Sock, Bin),
     Bin = gen_recv(Sock).
