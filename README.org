@@ -1,0 +1,36 @@
+# -*- org-confirm-babel-evaluate: nil -*-
+#+TITLE: mobility management entity (MME)
+#+CATEGORY: SmallCells
+
+
+* Overview
+  
+  The mobility management entity (MME) controls the high-level
+  operation of the mobile by means of signalling messages and Home
+  Subscriber Server (HSS).
+
+* Coding
+  
+
+* Building
+* Testing
+* Prototyping
+** tcp_server 
+   http://erlangcentral.org/wiki/index.php?title=Building_a_Non-blocking_TCP_server_using_OTP_principles
+
+* org-config                                                        :ARCHIVE:
+#+STARTUP: content hidestars logdone
+#+TAGS: DOCS(d) CODING(c) TESTING(t) PLANING(p)
+#+LINK_UP: sitemap.html
+#+LINK_HOME: main.html
+#+COMMENT: toc:nil
+#+OPTIONS: ^:nil
+#+OPTIONS:   H:3 num:t toc:t \n:nil @:t ::t |:t ^:nil -:t f:t *:t <:t
+#+OPTIONS:   TeX:t LaTeX:t skip:nil d:nil todo:t pri:nil tags:not-in-toc
+#+DESCRIPTION: Augment design process with system property discovering aid.
+#+KEYWORDS: SmallCell,
+#+LANGUAGE: en
+#+PROPERTY: Effort_ALL  1:00 2:00 4:00 6:00 8:00 12:00
+#+COLUMNS: %38ITEM(Details) %TAGS(Context) %7TODO(To Do) %5Effort(Time){:} %6CLOCKSUM{Total}
+
+#+STYLE: <link rel="stylesheet" type="text/css" href="org-manual.css" />
