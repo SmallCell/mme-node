@@ -10,7 +10,7 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(CHILD(I, Type, Args), {I, {I, start_link, [Args]}, permanent, 5000, Type, [I]}).
+-define(CHILD(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
 
 -define(MAX_RESTART,    5).
 -define(MAX_TIME,      60).
@@ -27,7 +27,7 @@ start_link(ListenPort, Module) ->
 %% ===================================================================
 
 init([Port, Module]) ->
-    TcpListener = ?CHILD(tcp_listenet, worker, [Port, Module]),
+    TcpListener = ?CHILD(tcp_listener, worker, [Port, Module]),
     TcpClientSup = ?CHILD(tcp_client_sup, supervisor, [Module]),
     {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME},
            [ TcpListener,TcpClientSup ]} }.
