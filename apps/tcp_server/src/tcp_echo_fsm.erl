@@ -1,180 +1,154 @@
-%%%-------------------------------------------------------------------
-%%% @author vlad <lib.aca55a@gmail.com>
-%%% @copyright (C) 2014, vlad
-%%% @doc
-%%%
-%%% @end
-%%% Created : 19 Dec 2014 by vlad <lib.aca55a@gmail.com>
-%%%-------------------------------------------------------------------
 -module(tcp_echo_fsm).
-
+-author('saleyn@gmail.com').
+ 
 -behaviour(gen_fsm).
-
-%% API
--export([start_link/0]).
-
+ 
+-export([start_link/0, set_socket/2]).
+ 
 %% gen_fsm callbacks
--export([init/1, state_name/2, state_name/3, handle_event/3,
+-export([init/1, handle_event/3,
          handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
--define(SERVER, ?MODULE).
-
--record(state, {}).
-
-%%%===================================================================
+-include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
+ 
+%% FSM States
+-export([
+    'WAIT_FOR_SOCKET'/2,
+    'WAIT_FOR_DATA'/2
+]).
+ 
+-record(state, {
+                socket,    % client socket
+                addr       % client address
+               }).
+ 
+-define(TIMEOUT, 120000).
+ 
+%%%------------------------------------------------------------------------
 %%% API
-%%%===================================================================
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Creates a gen_fsm process which calls Module:init/1 to
-%% initialize. To ensure a synchronized start-up procedure, this
-%% function does not return until Module:init/1 has returned.
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
+%%%------------------------------------------------------------------------
+ 
+%%-------------------------------------------------------------------------
+%% @spec (Socket) -> {ok,Pid} | ignore | {error,Error}
+%% @doc To be called by the supervisor in order to start the server.
+%%      If init/1 fails with Reason, the function returns {error,Reason}.
+%%      If init/1 returns {stop,Reason} or ignore, the process is
+%%      terminated and the function returns {error,Reason} or ignore,
+%%      respectively.
 %% @end
-%%--------------------------------------------------------------------
+%%-------------------------------------------------------------------------
 start_link() ->
-    gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
-
-%%%===================================================================
-%%% gen_fsm callbacks
-%%%===================================================================
-
-%%--------------------------------------------------------------------
+    gen_fsm:start_link(?MODULE, [], []).
+ 
+set_socket(Pid, Socket) when is_pid(Pid), is_port(Socket) ->
+    gen_fsm:send_event(Pid, {socket_ready, Socket}).
+ 
+%%%------------------------------------------------------------------------
+%%% Callback functions from gen_server
+%%%------------------------------------------------------------------------
+ 
+%%-------------------------------------------------------------------------
+%% Func: init/1
+%% Returns: {ok, StateName, StateData}          |
+%%          {ok, StateName, StateData, Timeout} |
+%%          ignore                              |
+%%          {stop, StopReason}
 %% @private
-%% @doc
-%% Whenever a gen_fsm is started using gen_fsm:start/[3,4] or
-%% gen_fsm:start_link/[3,4], this function is called by the new
-%% process to initialize.
-%%
-%% @spec init(Args) -> {ok, StateName, State} |
-%%                     {ok, StateName, State, Timeout} |
-%%                     ignore |
-%%                     {stop, StopReason}
-%% @end
-%%--------------------------------------------------------------------
+%%-------------------------------------------------------------------------
 init([]) ->
-    {ok, state_name, #state{}}.
-
-%%--------------------------------------------------------------------
+    process_flag(trap_exit, true),
+    ?testTraceItit(43, ['receive', print, timestamp, send]),
+    ?testTracePrint(43,"handle init"),
+    {ok, 'WAIT_FOR_SOCKET', #state{}}.
+ 
+%%-------------------------------------------------------------------------
+%% Func: StateName/2
+%% Returns: {next_state, NextStateName, NextStateData}          |
+%%          {next_state, NextStateName, NextStateData, Timeout} |
+%%          {stop, Reason, NewStateData}
 %% @private
-%% @doc
-%% There should be one instance of this function for each possible
-%% state name. Whenever a gen_fsm receives an event sent using
-%% gen_fsm:send_event/2, the instance of this function with the same
-%% name as the current state name StateName is called to handle
-%% the event. It is also called if a timeout occurs.
-%%
-%% @spec state_name(Event, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
-%% @end
-%%--------------------------------------------------------------------
-state_name(_Event, State) ->
-    {next_state, state_name, State}.
-
-%%--------------------------------------------------------------------
+%%-------------------------------------------------------------------------
+'WAIT_FOR_SOCKET'({socket_ready, Socket}, State) when is_port(Socket) ->
+    % Now we own the socket
+    inet:setopts(Socket, [{active, once}, {packet, 2}, binary]),
+    {ok, {IP, _Port}} = inet:peername(Socket),
+    {next_state, 'WAIT_FOR_DATA', State#state{socket=Socket, addr=IP}, ?TIMEOUT};
+'WAIT_FOR_SOCKET'(Other, State) ->
+    error_logger:error_msg("State: 'WAIT_FOR_SOCKET'. Unexpected message: ~p\n", [Other]),
+    %% Allow to receive async messages
+    {next_state, 'WAIT_FOR_SOCKET', State}.
+ 
+%% Notification event coming from client
+'WAIT_FOR_DATA'({data, Data}, #state{socket=S} = State) ->
+    ok = gen_tcp:send(S, Data),
+    {next_state, 'WAIT_FOR_DATA', State, ?TIMEOUT};
+ 
+'WAIT_FOR_DATA'(timeout, State) ->
+    error_logger:error_msg("~p Client connection timeout - closing.\n", [self()]),
+    {stop, normal, State};
+ 
+'WAIT_FOR_DATA'(Data, State) ->
+    io:format("~p Ignoring data: ~p\n", [self(), Data]),
+    {next_state, 'WAIT_FOR_DATA', State, ?TIMEOUT}.
+ 
+%%-------------------------------------------------------------------------
+%% Func: handle_event/3
+%% Returns: {next_state, NextStateName, NextStateData}          |
+%%          {next_state, NextStateName, NextStateData, Timeout} |
+%%          {stop, Reason, NewStateData}
 %% @private
-%% @doc
-%% There should be one instance of this function for each possible
-%% state name. Whenever a gen_fsm receives an event sent using
-%% gen_fsm:sync_send_event/[2,3], the instance of this function with
-%% the same name as the current state name StateName is called to
-%% handle the event.
-%%
-%% @spec state_name(Event, From, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {reply, Reply, NextStateName, NextState} |
-%%                   {reply, Reply, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState} |
-%%                   {stop, Reason, Reply, NewState}
-%% @end
-%%--------------------------------------------------------------------
-state_name(_Event, _From, State) ->
-    Reply = ok,
-    {reply, Reply, state_name, State}.
-
-%%--------------------------------------------------------------------
+%%-------------------------------------------------------------------------
+handle_event(Event, StateName, StateData) ->
+    {stop, {StateName, undefined_event, Event}, StateData}.
+ 
+%%-------------------------------------------------------------------------
+%% Func: handle_sync_event/4
+%% Returns: {next_state, NextStateName, NextStateData}            |
+%%          {next_state, NextStateName, NextStateData, Timeout}   |
+%%          {reply, Reply, NextStateName, NextStateData}          |
+%%          {reply, Reply, NextStateName, NextStateData, Timeout} |
+%%          {stop, Reason, NewStateData}                          |
+%%          {stop, Reason, Reply, NewStateData}
 %% @private
-%% @doc
-%% Whenever a gen_fsm receives an event sent using
-%% gen_fsm:send_all_state_event/2, this function is called to handle
-%% the event.
-%%
-%% @spec handle_event(Event, StateName, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
-%% @end
-%%--------------------------------------------------------------------
-handle_event(_Event, StateName, State) ->
-    {next_state, StateName, State}.
-
-%%--------------------------------------------------------------------
+%%-------------------------------------------------------------------------
+handle_sync_event(Event, _From, StateName, StateData) ->
+    {stop, {StateName, undefined_event, Event}, StateData}.
+ 
+%%-------------------------------------------------------------------------
+%% Func: handle_info/3
+%% Returns: {next_state, NextStateName, NextStateData}          |
+%%          {next_state, NextStateName, NextStateData, Timeout} |
+%%          {stop, Reason, NewStateData}
 %% @private
-%% @doc
-%% Whenever a gen_fsm receives an event sent using
-%% gen_fsm:sync_send_all_state_event/[2,3], this function is called
-%% to handle the event.
-%%
-%% @spec handle_sync_event(Event, From, StateName, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {reply, Reply, NextStateName, NextState} |
-%%                   {reply, Reply, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState} |
-%%                   {stop, Reason, Reply, NewState}
-%% @end
-%%--------------------------------------------------------------------
-handle_sync_event(_Event, _From, StateName, State) ->
-    Reply = ok,
-    {reply, Reply, StateName, State}.
-
-%%--------------------------------------------------------------------
+%%-------------------------------------------------------------------------
+handle_info({tcp, Socket, Bin}, StateName, #state{socket=Socket} = StateData) ->
+    % Flow control: enable forwarding of next TCP message
+    inet:setopts(Socket, [{active, once}]),
+    ?MODULE:StateName({data, Bin}, StateData);
+ 
+handle_info({tcp_closed, Socket}, _StateName,
+            #state{socket=Socket, addr=Addr} = StateData) ->
+    error_logger:info_msg("~p Client ~p disconnected.\n", [self(), Addr]),
+    {stop, normal, StateData};
+ 
+handle_info(_Info, StateName, StateData) ->
+    {noreply, StateName, StateData}.
+ 
+%%-------------------------------------------------------------------------
+%% Func: terminate/3
+%% Purpose: Shutdown the fsm
+%% Returns: any
 %% @private
-%% @doc
-%% This function is called by a gen_fsm when it receives any
-%% message other than a synchronous or asynchronous event
-%% (or a system message).
-%%
-%% @spec handle_info(Info,StateName,State)->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
-%% @end
-%%--------------------------------------------------------------------
-handle_info(_Info, StateName, State) ->
-    {next_state, StateName, State}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_fsm when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_fsm terminates with
-%% Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, StateName, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
-terminate(_Reason, _StateName, _State) ->
+%%-------------------------------------------------------------------------
+terminate(_Reason, _StateName, #state{socket=Socket}) ->
+    (catch gen_tcp:close(Socket)),
     ok.
-
-%%--------------------------------------------------------------------
+ 
+%%-------------------------------------------------------------------------
+%% Func: code_change/4
+%% Purpose: Convert process state when code is changed
+%% Returns: {ok, NewState, NewStateData}
 %% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, StateName, State, Extra) ->
-%%                   {ok, StateName, NewState}
-%% @end
-%%--------------------------------------------------------------------
-code_change(_OldVsn, StateName, State, _Extra) ->
-    {ok, StateName, State}.
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+%%-------------------------------------------------------------------------
+code_change(_OldVsn, StateName, StateData, _Extra) ->
+    {ok, StateName, StateData}.

@@ -2,7 +2,8 @@
 APP := mme
 VSN = $(shell sed -n 's/.*{vsn,.*"\(.*\)"}.*/\1/p' apps/$(APP)/$(APP).app.src)
 
-REBAR='./rebar'
+
+REBAR=./rebar
 
 .PHONY: deps docs
 
@@ -12,7 +13,7 @@ compile: deps
 	$(REBAR) -v compile
 
 app:
-	@./rebar compile skip_deps=true
+	$(REBAR) compile skip_deps=true
 
 deps:
 	$(REBAR) check-deps || $(REBAR) get-deps
@@ -66,3 +67,11 @@ vztest:
 	VIEWER=firefox ${FSM_DYNAMIC} test/$(SUT).erl
 
 ##################################################################
+
+setup_dialyzer:
+	dialyzer --build_plt --apps erts kernel stdlib mnesia compiler syntax_tools runtime_tools crypto tools inets ssl webtool public_key observer
+# dialyzer --add_to_plt deps/*/ebin
+
+dialyzer:
+	dialyzer apps/*/ebin
+

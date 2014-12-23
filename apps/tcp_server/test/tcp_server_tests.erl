@@ -10,26 +10,49 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
 
+-define(DEF_PORT,    2222).
+
+tcp_server_setup_test_() ->
+   {timeout, 3000,
+     {setup,
+      fun setup/0,
+      fun teardown/1, 
+         [{"Start/stop LINC common logic", fun logic/0}]}}.
+ 
+ logic() -> 
+    Config = [], 
+    %% SPAWN TRACES
+    Pid = spawn(eunit_seq_trace,tracer,[]),
+    seq_trace:set_system_tracer(Pid), % set Pid as the system tracer  
+ 
+    ?assertEqual(ok, application:start(tcp_server)), 
+    {ok,S} = gen_tcp:connect({127,0,0,1},?DEF_PORT,[{packet,2}]),    
+    ok = gen_tcp:send(S,<<"hello">>), 
+    receive {tcp, _, M} ->     
+            ?assertEqual("hello", M)
+    end
+    %% ?assertEqual(ok, application:stop(tcp_server)),
+
+    %% receive
+    %%     {results, Errors} ->
+    %%         ?debugFmt("Errors: ~p~n", [Errors]),
+    %%           ?assertEqual(0, length(Errors))
+     %% end 
+     . 
+  
+setup() ->
+    erlang:display(setup),
+    ensure_started(sasl),
+      ok. 
+
+
+teardown(_) ->
+    application:stop(tcp_server),
+    ok.
+
+
 ensure_started(App) ->
     case application:start(App) of
         ok -> ok;
         {error, {already_started, App}} -> ok
     end.
-
-start_stop_test_() ->
-    {setup,
-     fun() ->
-             erlang:display(setup),
-             %% ensure_started(sasl),
-             application:start(tcp_server)
-     end,
-     fun(_) ->
-             erlang:display(cleanup),
-             application:stop(tcp_server)
-     end,
-     ?_test(
-        begin
-            receive after 3000 -> ok end
-        end)
-    }.
-

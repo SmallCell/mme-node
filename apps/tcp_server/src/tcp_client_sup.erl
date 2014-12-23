@@ -26,15 +26,15 @@ start_link(Module) ->
 
 init([Module]) ->
    
-    TcpClient =
-        {   undefined,                               % Id       = internal id
-            {Module,start_link,[]},                  % StartFun = {M, F, A}
-            temporary,                               % Restart  = permanent | transient | temporary
-            2000,                                    % Shutdown = brutal_kill | int() >= 0 | infinity
-            worker,                                  % Type     = worker | supervisor
-            []                                       % Modules  = [Module] | dynamic
-        },
-    {ok, { {simple_one_for_one, ?MAX_RESTART, ?MAX_TIME}, [ TcpClient ]} }.
+    %% TcpClient =
+    %%     {   undefined,                               % Id       = internal id
+    %%         {Module,start_link,[]},                  % StartFun = {M, F, A}
+    %%         temporary,                               % Restart  = permanent | transient | temporary
+    %%         2000,                                    % Shutdown = brutal_kill | int() >= 0 | infinity
+    %%         worker,                                  % Type     = worker | supervisor
+    %%         []                                       % Modules  = [Module] | dynamic
+    %%     },
+    {ok, { {simple_one_for_one, ?MAX_RESTART, ?MAX_TIME}, [  ]} }.
 
 %%%===================================================================
 %%% Internal functions
