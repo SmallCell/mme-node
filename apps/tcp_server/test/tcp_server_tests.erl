@@ -20,14 +20,13 @@ tcp_server_setup_test_() ->
          [{"Start/stop LINC common logic", fun logic/0}]}}.
  
  logic() -> 
-    Config = [], 
     %% SPAWN TRACES
     Pid = spawn(eunit_seq_trace,tracer,[]),
     seq_trace:set_system_tracer(Pid), % set Pid as the system tracer  
  
     ?assertEqual(ok, application:start(tcp_server)), 
     {ok,S} = gen_tcp:connect({127,0,0,1},?DEF_PORT,[{packet,2}]),    
-    ok = gen_tcp:send(S,<<"hello">>), 
+    ok = gen_tcp:send(S,"hello"), 
     receive {tcp, _, M} ->     
             ?assertEqual("hello", M)
     end. 
@@ -36,7 +35,6 @@ setup() ->
     erlang:display(setup),
     ensure_started(sasl),
       ok.   
-
  
 teardown(_) ->
     application:stop(tcp_server),
