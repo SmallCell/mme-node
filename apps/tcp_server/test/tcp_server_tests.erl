@@ -30,22 +30,14 @@ tcp_server_setup_test_() ->
     ok = gen_tcp:send(S,<<"hello">>), 
     receive {tcp, _, M} ->     
             ?assertEqual("hello", M)
-    end
-    %% ?assertEqual(ok, application:stop(tcp_server)),
-
-    %% receive
-    %%     {results, Errors} ->
-    %%         ?debugFmt("Errors: ~p~n", [Errors]),
-    %%           ?assertEqual(0, length(Errors))
-     %% end 
-     . 
-  
+    end. 
+   
 setup() ->
     erlang:display(setup),
     ensure_started(sasl),
-      ok. 
+      ok.   
 
-
+ 
 teardown(_) ->
     application:stop(tcp_server),
     ok.

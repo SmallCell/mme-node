@@ -26,9 +26,31 @@ start_link(ListenPort, Module) ->
 %% Supervisor callbacks
 %% ===================================================================
 
+%%----------------------------------------------------------------------
+%% Supervisor behaviour callbacks
+%%----------------------------------------------------------------------
 init([Port, Module]) ->
-    %% TcpListener = ?CHILD(tcp_listener, worker, [Port, Module]),
-    %% TcpClientSup = ?CHILD(tcp_client_sup, supervisor, [Module]),
-    {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME},
-           [  ]} }.
+    {ok,
+        {_SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
+            [
+              % TCP Listener
+              {   tcp_server_sup,                          % Id       = internal id
+                  {tcp_listener,start_link,[Port,Module]}, % StartFun = {M, F, A}
+                  permanent,                               % Restart  = permanent | transient | temporary
+                  2000,                                    % Shutdown = brutal_kill | int() >= 0 | infinity
+                  worker,                                  % Type     = worker | supervisor
+                  [tcp_listener]                           % Modules  = [Module] | dynamic
+              },
+              % Client instance supervisor
+              {   tcp_client_sup,
+                  {tcp_client_sup,start_link, [Module]},
+                  permanent,                               % Restart  = permanent | transient | temporary
+                  infinity,                                % Shutdown = brutal_kill | int() >= 0 | infinity
+                  supervisor,                              % Type     = worker | supervisor
+                  []                                       % Modules  = [Module] | dynamic
+              }
+            ]
+        }
+    }.
+ 
 
