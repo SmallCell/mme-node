@@ -1,0 +1,5 @@
+:name "mme-node"
+:node-sname "mme-node"
+:lib-dirs '("apps" "deps" "scripts")
+:app-include-dirs '("include")
+:erlang-cookie "django"

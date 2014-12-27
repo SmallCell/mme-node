@@ -9,7 +9,7 @@ REBAR=./rebar
 
 all: compile
 
-compile: deps 
+compile: deps
 	$(REBAR) -v compile
 
 app:
@@ -20,7 +20,7 @@ deps:
 
 clean:
 	$(REBAR) clean
-	-@rm -rf .eunit/*.beam erl_crash.dump ebin/*.beam
+	-@rm -rf .eunit/*.beam erl_crash.dump
 	-@rm -f *_fsm.beam *_fsm.dot *_fsm.erl *_fsm.jpeg
 	-@rm -f *_eqc.beam *_eqc.dot *_eqc.erl *_eqc.jpg
 
@@ -58,12 +58,12 @@ eunit-shell:
 ##################################################################
 SUT ?= tradepost
 SUITE=$(SUT)_tests
-FSM_DYNAMIC=ebin/fsm_dynamic
+FSM_DYNAMIC=scripts/fsm_dynamic
 
 
 vztest:
 	erlc ${ERLANG_INCLUDE} -DTEST -o ${BINDIR} test/${SUITE}.erl
-	erl -noshell ${ERLANG_PATH} -eval "eunit:test(${SUITE}, [verbose])." -run init stop	
+	erl -noshell ${ERLANG_PATH} -eval "eunit:test(${SUITE}, [verbose])." -run init stop
 	VIEWER=firefox ${FSM_DYNAMIC} test/$(SUT).erl
 
 ##################################################################
@@ -74,4 +74,3 @@ setup_dialyzer:
 
 dialyzer:
 	dialyzer apps/*/ebin
-
