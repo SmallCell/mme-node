@@ -5,14 +5,14 @@
 %%% @end
 %%% Created : 19 Dec 2014 by vlad <lib.aca55a@gmail.com>
 
--module(tcp_server_tests).
+-module(sctp_server_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
 
--define(DEF_PORT,    2222).
+-define(DEF_PORT,    3333).
 
-tcp_server_setup_test_() ->
+sctp_server_setup_test_() ->
    {timeout, 3000,
      {setup,
       fun setup/0,
@@ -21,7 +21,7 @@ tcp_server_setup_test_() ->
 
  logic() ->
 
-    ?assertEqual(ok, application:start(tcp_server)),
+    ?assertEqual(ok, application:start(sctp_server)),
     {ok,S} = gen_tcp:connect({127,0,0,1},?DEF_PORT,[{packet,2}]),
     ok = gen_tcp:send(S,"hello"),
     receive {tcp, _, M} ->
@@ -37,7 +37,7 @@ setup() ->
     Pid.
 
 teardown(TracerPid) ->
-    application:stop(tcp_server),
+    application:stop(sctp_server),
     exit(TracerPid, ok),
     ok.
 

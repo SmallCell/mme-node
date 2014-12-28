@@ -4,25 +4,45 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([start_link/2]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define(MAX_RESTART,    5).
+-define(MAX_TIME,      60).
 
 %% ===================================================================
 %% API functions
 %% ===================================================================
 
-start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+start_link(ListenPort, Module) ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, [ListenPort, Module]).
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
-init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
-
+init([Port, Module]) ->
+    {ok,
+     {_SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
+      [
+                                                % SCTP Listener
+       {   sctp_server_sup,                          % Id       = internal id
+           {sctp_listener,start_link,[Port,Module]}, % StartFun = {M, F, A}
+           permanent,                               % Restart  = permanent | transient | temporary
+           2000,                                    % Shutdown = brutal_kill | int() >= 0 | infinity
+           worker,                                  % Type     = worker | supervisor
+           [sctp_listener]                           % Modules  = [Module] | dynamic
+       },
+                                                % Client instance supervisor
+       {   sctp_client_sup,
+           {sctp_client_sup,start_link, [Module]},
+           permanent,                               % Restart  = permanent | transient | temporary
+           infinity,                                % Shutdown = brutal_kill | int() >= 0 | infinity
+           supervisor,                              % Type     = worker | supervisor
+           []                                       % Modules  = [Module] | dynamic
+       }
+      ]
+     }
+    }.
