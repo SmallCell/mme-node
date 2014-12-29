@@ -17,7 +17,16 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
 
+-include_lib("kernel/include/inet.hrl").
+-include_lib("kernel/include/inet_sctp.hrl").
 -include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
+
+
+%% Request a specific number of streams just because we can.
+-define(SCTP_INIT, #sctp_initmsg{num_ostreams = 5,
+                                 max_instreams = 5}).
+-define(SCTP_OPTS, [binary, {active, true}, {sctp_initmsg, ?SCTP_INIT}]).
+
 
 -record(state, {
                 listener,       % Listening socket
@@ -54,15 +63,16 @@ init([Port, Module]) ->
     ?testTracePrint(42,"listener init"),
     Opts = [binary, {packet, 2}, {reuseaddr, true},
             {keepalive, true}, {backlog, 30}, {active, false}],
-    case gen_tcp:listen(Port, Opts) of
-    {ok, Listen_socket} ->
-        %%Create first accepting process
-        {ok, Ref} = prim_inet:async_accept(Listen_socket, -1),
-        {ok, #state{listener = Listen_socket,
-                    acceptor = Ref,
-                    module   = Module}};
-    {error, Reason} ->
-        {stop, Reason}
+    case gen_sctp:open([{ip, any}, {port, Port} | ?SCTP_OPTS]) of
+        {ok, Listen_socket} ->
+            %%Create first accepting process
+            ok = gen_sctp:listen(Listen_socket, true),
+            %% {ok, Ref} = prim_inet:async_accept(Listen_socket, -1),
+            {ok, #state{listener = Listen_socket,
+                        acceptor = Listen_socket,
+                        module   = Module}};
+        {error, Reason} ->
+            {stop, Reason}
     end.
 
 %%-------------------------------------------------------------------------

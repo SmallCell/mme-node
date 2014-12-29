@@ -7,26 +7,46 @@
 
 -module(sctp_server_tests).
 
+-include_lib("kernel/include/inet.hrl").
+-include_lib("kernel/include/inet_sctp.hrl").
+
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
-
+  
+%% Receive a message.
+-define(RECV(Pat, Ret), receive Pat -> Ret end).
+-define(RECV(Pat), ?RECV(Pat, now())).
+ 
 -define(DEF_PORT,    3333).
+-define(SCTP(Sock, Data), {sctp, Sock, _, _, Data}).
 
 sctp_server_setup_test_() ->
    {timeout, 3000,
      {setup,
       fun setup/0,
       fun teardown/1,
-         [{"Start/stop TCP server common logic", fun logic/0}]}}.
+         [{"Start/stop SCTP server common logic", fun logic/0}]}}.
 
- logic() ->
-
+logic() ->
     ?assertEqual(ok, application:start(sctp_server)),
-    {ok,S} = gen_tcp:connect({127,0,0,1},?DEF_PORT,[{packet,2}]),
-    ok = gen_tcp:send(S,"hello"),
-    receive {tcp, _, M} ->
-            ?assertEqual("hello", M)
-    end.
+    ?testTraceItit(44, ['receive', print, timestamp, send]),
+    ?testTracePrint(44,"logic init"),
+
+
+    {ok,S}     = gen_sctp:open(),
+    {ok,Assoc} = gen_sctp:connect (S, {127,0,0,1}, ?DEF_PORT, 
+                                   [{sctp_initmsg,#sctp_initmsg{num_ostreams=5}}]),
+
+    Assoc = ?RECV(?SCTP(S, {_, #sctp_assoc_change{state = comm_up,
+                                                  outbound_streams = O,
+                                                  inbound_streams = I,
+                                                  assoc_id = A}}),
+                  {O, I, A}),
+
+    ok = gen_sctp:send(S, A, "hello"),
+
+    ?RECV(?SCTP(S, {[#sctp_sndrcvinfo{assoc_id = A}], Bin}), Bin),
+    ?assertEqual("hello", Bin).
 
 setup() ->
     erlang:display(setup),
