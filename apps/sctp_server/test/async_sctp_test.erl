@@ -23,24 +23,27 @@ acceptor(IP, Port) ->
     ?testTraceItit(44, ['receive', print, timestamp, send]),
     ?testTracePrint(44,"acceptor init"),
 
-    {ok,S} = gen_sctp:open(Port, [{recbuf,65536}, {ip,IP}, {reuseaddr, true}, {active, once}]), 
-    ok     = gen_sctp:listen(S, 30),
+    {ok,S} = gen_sctp:open(Port, [{recbuf,65536}, {ip,IP}, {reuseaddr, true}, {active, false}]), 
+    ok     = gen_sctp:listen(S, true),
 
     acceptor_loop(S).
 
 acceptor_loop(S) ->    
-    receive
+    case gen_sctp:recv(S) of
         {error, Error} ->
             ?debugFmt("ACPT SCTP RECV ERROR: ~p~n", [Error]);
-        {sctp, S, Host,  Port,
-         {[],#sctp_assoc_change{state = comm_up,error = 0, 
-                                outbound_streams = OS,
-                                inbound_streams = IS,
-                                assoc_id = A}}} ->
-        %% {sctp, Port, H,FromP,[], #sctp_assoc_change{state = comm_up,error = 0, 
-        %%                                             outbound_streams = OS,
-        %%                                             inbound_streams = IS,
-        %%                                             assoc_id = A}} ->
+        %% {sctp, S, Host,  Port,
+        %%  {[],#sctp_assoc_change{state = comm_up,error = 0, 
+        %%                         outbound_streams = OS,
+        %%                         inbound_streams = IS,
+        %%                         assoc_id = A}}} ->
+        %% {ok,{{127,0,0,1}, 33302,[],
+        %%      {sctp_assoc_change,comm_up,0,10,5,168}}}
+        {ok,{H, FromP, [], #sctp_assoc_change{state = comm_up,
+                                              error = 0, 
+                                              outbound_streams = OS,
+                                              inbound_streams = IS,
+                                              assoc_id = A}}} ->
             {ok, CliSocket} = gen_sctp:peeloff(S, A),
             ?debugFmt("ACPT Assoc up: ~p~n", [A]), 
             ?debugFmt(">> S: ~p, C: ~p",[S,CliSocket]),
@@ -58,15 +61,18 @@ svc_loop(S) ->
     receive
         {error, Error} ->
              ?debugFmt("SVC RECV ERROR: ~p~n", [Error]);
-        Data ->
+        Data -> 
+              inet:setopts(S, [{active, once}]),
             ?debugFmt("SVC Received: ~p~n", [Data])
     end,
     svc_loop(S).
 
 client() ->
     client(?DEF_HOST, ?DEF_PORT).
- 
 
+client(PORT) ->
+    client(?DEF_HOST, PORT).
+ 
 client(Host, Port) when is_integer(Port) ->
     {ok,S} = gen_sctp:open(), 
     {ok,Assoc} = gen_sctp:connect 
@@ -91,12 +97,12 @@ logic() ->
     exit(Pid, ok ).
  
 async_sctp_setup_test_() -> 
-   {timeout, 3000, 
+   {timeout, 5000, 
      {setup,
       fun setup/0,
       fun teardown/1,
          [{"Start/stop SCTP server common logic", fun logic/0}]}}.
-
+ 
 setup() ->
     Pid = spawn(eunit_seq_trace,tracer,[]),
     seq_trace:set_system_tracer(Pid), % set Pid as the system tracer

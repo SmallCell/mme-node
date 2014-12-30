@@ -1,12 +1,14 @@
 {application, mme,
  [
-  {description, ""},
-  {vsn, "1"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
+  {description, "LTE MME Node"},
+  {vsn, "1.0"},
+  {applications, [kernel,
+                  stdlib,
+                  lager,
+                  mnesia
                  ]},
-  {mod, { mme_app, []}},
-  {env, []}
+  {mod, { mme, []}},
+  {env, [
+       {mme_config, enabled}
+        ]}
  ]}.

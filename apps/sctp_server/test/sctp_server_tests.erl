@@ -6,7 +6,7 @@
 %%% Created : 19 Dec 2014 by vlad <lib.aca55a@gmail.com>
 
 -module(sctp_server_tests).
-
+ 
 -include_lib("kernel/include/inet.hrl").
 -include_lib("kernel/include/inet_sctp.hrl").
 
@@ -17,13 +17,14 @@
 -define(RECV(Pat, Ret), receive Pat -> Ret end).
 -define(RECV(Pat), ?RECV(Pat, now())).
  
+-define(DEF_HOST, {127,0,0,1}).
 -define(DEF_PORT,    3333).
 -define(SCTP(Sock, Data), {sctp, Sock, _, _, Data}).
 
 sctp_server_setup_test_() ->
    {timeout, 3000,
      {setup,
-      fun setup/0,
+      fun setup/0, 
       fun teardown/1,
          [{"Start/stop SCTP server common logic", fun logic/0}]}}.
 
@@ -32,32 +33,31 @@ logic() ->
     ?testTraceItit(44, ['receive', print, timestamp, send]),
     ?testTracePrint(44,"logic init"),
 
+    {ok,S} = gen_sctp:open(), 
+    {ok,Assoc} = gen_sctp:connect 
+                   (S, ?DEF_HOST, ?DEF_PORT, [{sctp_initmsg,#sctp_initmsg{num_ostreams=5}}]),
+    ?debugFmt("Connection Successful, Assoc=~p~n", [Assoc]),
+      
+    ?debugVal(gen_sctp:send(S, Assoc, 0, <<"hello">>)),
+    
+    {ok,{_,_,[#sctp_sndrcvinfo{}], Bin}} = gen_sctp:recv(S,1000),
 
-    {ok,S}     = gen_sctp:open(),
-    {ok,Assoc} = gen_sctp:connect (S, {127,0,0,1}, ?DEF_PORT, 
-                                   [{sctp_initmsg,#sctp_initmsg{num_ostreams=5}}]),
-
-    Assoc = ?RECV(?SCTP(S, {_, #sctp_assoc_change{state = comm_up,
-                                                  outbound_streams = O,
-                                                  inbound_streams = I,
-                                                  assoc_id = A}}),
-                  {O, I, A}),
-
-    ok = gen_sctp:send(S, A, "hello"),
-
-    ?RECV(?SCTP(S, {[#sctp_sndrcvinfo{assoc_id = A}], Bin}), Bin),
-    ?assertEqual("hello", Bin).
-
+    ?assertEqual(<<"hello">>, Bin). 
+ 
+ 
 setup() ->
     erlang:display(setup),
-    ensure_started(sasl),
+    ensure_started(sasl), 
+    ensure_started(compiler),
+    ensure_started(syntax_tools), 
+    ensure_started(lager),
     %% SPAWN TRACES
     Pid = spawn(eunit_seq_trace,tracer,[]),
     seq_trace:set_system_tracer(Pid), % set Pid as the system tracer
-    Pid.
-
+     Pid.
+ 
 teardown(TracerPid) ->
-    application:stop(sctp_server),
+     application:stop(sctp_server),
     exit(TracerPid, ok),
     ok.
 

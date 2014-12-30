@@ -20,19 +20,21 @@
 -include_lib("kernel/include/inet.hrl").
 -include_lib("kernel/include/inet_sctp.hrl").
 -include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
+-include_lib("mme/include/mme_logger.hrl").
+
 
 
 %% Request a specific number of streams just because we can.
 -define(SCTP_INIT, #sctp_initmsg{num_ostreams = 5,
                                  max_instreams = 5}).
--define(SCTP_OPTS, [binary, {active, true}, {sctp_initmsg, ?SCTP_INIT}]).
+-define(SCTP_OPTS, [binary, {recbuf,65536}, {reuseaddr, true}, {sctp_initmsg, ?SCTP_INIT}]).
 
 
 -record(state, {
-                listener,       % Listening socket
-                acceptor,       % Asynchronous acceptor's internal reference
-                module          % FSM handling module
-               }).
+          ref      :: reference(),
+          listener :: gen_sctp:sctp_socket(),       % Listening socket
+          module   :: atom()       % FSM handling module
+         }).
 
 %%--------------------------------------------------------------------
 %% @spec (Port::integer(), Module) -> {ok, Pid} | {error, Reason}
@@ -61,43 +63,29 @@ init([Port, Module]) ->
     process_flag(trap_exit, true),
     ?testTraceItit(42, ['receive', print, timestamp, send]),
     ?testTracePrint(42,"listener init"),
-    Opts = [binary, {packet, 2}, {reuseaddr, true},
-            {keepalive, true}, {backlog, 30}, {active, false}],
-    case gen_sctp:open([{ip, any}, {port, Port} | ?SCTP_OPTS]) of
+    Opts = [{ip, any}, {port, Port}, {active, once} | ?SCTP_OPTS],
+    case gen_sctp:open(Opts) of
         {ok, Listen_socket} ->
             %%Create first accepting process
             ok = gen_sctp:listen(Listen_socket, true),
-            %% {ok, Ref} = prim_inet:async_accept(Listen_socket, -1),
             {ok, #state{listener = Listen_socket,
-                        acceptor = Listen_socket,
                         module   = Module}};
         {error, Reason} ->
             {stop, Reason}
     end.
 
 %%-------------------------------------------------------------------------
-%% @spec (Request, From, State) -> {reply, Reply, State}          |
-%%                                 {reply, Reply, State, Timeout} |
-%%                                 {noreply, State}               |
-%%                                 {noreply, State, Timeout}      |
-%%                                 {stop, Reason, Reply, State}   |
-%%                                 {stop, Reason, State}
 %% @doc Callback for synchronous server calls.  If `{stop, ...}' tuple
 %%      is returned, the server is stopped and `terminate/2' is called.
 %% @end
-%% @private
 %%-------------------------------------------------------------------------
 handle_call(Request, _From, State) ->
     {stop, {unknown_call, Request}, State}.
 
 %%-------------------------------------------------------------------------
-%% @spec (Msg, State) ->{noreply, State}          |
-%%                      {noreply, State, Timeout} |
-%%                      {stop, Reason, State}
 %% @doc Callback for asyncrous server calls.  If `{stop, ...}' tuple
 %%      is returned, the server is stopped and `terminate/2' is called.
 %% @end
-%% @private
 %%-------------------------------------------------------------------------
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -112,38 +100,43 @@ handle_cast(_Msg, State) ->
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
-handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
-            #state{listener=ListSock, acceptor=Ref, module=Module} = State) ->
+
+%% Association established ...
+handle_info({sctp, ListSock, FromIP, FromPort,
+             {[], #sctp_assoc_change{state = comm_up,
+                                     outbound_streams = OS,
+                                     inbound_streams = IS,
+                                     assoc_id = AssocId}}},
+            #state{listener=ListSock, module=Module} = State) ->
     try
-        case set_sockopt(ListSock, CliSocket) of
-        ok              -> ok;
-        {error, Reason} -> exit({set_sockopt, Reason})
-        end,
+        {ok, CliSocket} = gen_sctp:peeloff(ListSock, AssocId),
 
         %% New client connected - spawn a new process using the simple_one_for_one
         %% supervisor.
         {ok, Pid} = sctp_server_app:start_client(),
-        gen_tcp:controlling_process(CliSocket, Pid),
+        gen_sctp:controlling_process(CliSocket, Pid),
         %% Instruct the new FSM that it owns the socket.
-        Module:set_socket(Pid, CliSocket),
+        Module:set_socket(Pid, CliSocket, AssocId),
 
         %% Signal the network driver that we are ready to accept another connection
-        case prim_inet:async_accept(ListSock, -1) of
-        {ok,    NewRef} -> ok;
-        {error, NewRef} -> exit({async_accept, inet:format_error(NewRef)})
-        end,
+        inet:setopts(ListSock, [{active, once}]), 
 
-        {noreply, State#state{acceptor=NewRef}}
+        {noreply, State}
     catch exit:Why ->
-        error_logger:error_msg("Error in async accept: ~p.\n", [Why]),
+        ?ERROR("Error in async accept: ~p.\n", [Why]),
         {stop, Why, State}
     end;
 
-handle_info({inet_async, ListSock, Ref, Error}, #state{listener=ListSock, acceptor=Ref} = State) ->
-    error_logger:error_msg("Error in socket acceptor: ~p.\n", [Error]),
-    {stop, Error, State};
-
-handle_info(_Info, State) ->
+%% Lost association after establishment.
+handle_info({sctp, _Sock, RA, _RP, #sctp_assoc_change{} = SAC}, State) ->
+    ?ERROR("Lost association after establishment state: ~p assoc: ~p remote: ~p", 
+           [SAC#sctp_assoc_change.state, 
+            SAC#sctp_assoc_change.assoc_id,
+            RA]),
+    {noreply, State};
+handle_info({sctp, _Sock, _RA, _RP, #sctp_paddr_change{}}, State) ->
+    {noreply, State};
+handle_info({sctp, _Sock, _RA, _RP, #sctp_pdapi_event{}}, State) ->
     {noreply, State}.
 
 %%-------------------------------------------------------------------------
@@ -155,7 +148,7 @@ handle_info(_Info, State) ->
 %% @private
 %%-------------------------------------------------------------------------
 terminate(_Reason, State) ->
-    gen_tcp:close(State#state.listener),
+    gen_sctp:close(State#state.listener),
     ok.
 
 %%-------------------------------------------------------------------------
@@ -171,16 +164,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%------------------------------------------------------------------------
 
-%% Taken from prim_inet.  We are merely copying some socket options from the
-%% listening socket to the new client socket.
-set_sockopt(ListSock, CliSocket) ->
-    true = inet_db:register_socket(CliSocket, inet_tcp),
-    case prim_inet:getopts(ListSock, [active, nodelay, keepalive, delay_send, priority, tos]) of
-    {ok, Opts} ->
-        case prim_inet:setopts(CliSocket, Opts) of
-        ok    -> ok;
-        Error -> gen_tcp:close(CliSocket), Error
-        end;
-    Error ->
-        gen_tcp:close(CliSocket), Error
-    end.
