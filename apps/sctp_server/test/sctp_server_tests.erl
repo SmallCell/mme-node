@@ -11,6 +11,7 @@
 -include_lib("kernel/include/inet_sctp.hrl").
 
 -include_lib("eunit/include/eunit.hrl").
+
 -include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
   
 %% Receive a message.

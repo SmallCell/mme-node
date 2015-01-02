@@ -19,9 +19,11 @@
 
 -include_lib("kernel/include/inet.hrl").
 -include_lib("kernel/include/inet_sctp.hrl").
--include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
+
 -include_lib("mme/include/mme_logger.hrl").
 
+%% -define(NOTRACE,true).
+-include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
 
 
 %% Request a specific number of streams just because we can.
