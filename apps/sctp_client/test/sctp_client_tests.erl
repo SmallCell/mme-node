@@ -34,7 +34,7 @@ logic() ->
     %%     {comm_up, Ref, CPid} -> 
     %%         ok
     %% end,
-    timer:sleep(1000), 
+    timer:sleep(2000), 
     ok.  
       
 

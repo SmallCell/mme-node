@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, connect/3]).
+-export([start_link/1, connect/3, disconnect/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -24,6 +24,8 @@
 
 -define(SERVER, ?MODULE).
 
+-define(RECONNECT_TIMEOUT, 200).
+
 %% Request a specific number of streams just because we can.
 -define(SCTP_INIT, #sctp_initmsg{num_ostreams = 5,
                                  max_instreams = 5}).
@@ -31,8 +33,8 @@
 
 -record(state, {
           connector :: gen_sctp:sctp_socket(),  % Connector socket
-          connection_ref :: reference(),        % Conection reference
-          supper :: pid(),                      % Initiator process
+          assoc_id  :: any(),                   % Initiator process
+          handler  :: pid(),                    % Current handling process
           module    :: atom()                   % FSM handling module
          }).
 
@@ -51,19 +53,23 @@
 start_link(Module) when is_atom(Module) ->
     gen_server:start_link(?MODULE, [Module], []).
 
-
 %%--------------------------------------------------------------------
 %% @doc
 %% Attmpt peer connection
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
--spec connect(pid(),inet:ip_address(), inet:port_number()) -> {ok, pid()}.
+-spec connect(pid(),inet:ip_address(),inet:port_number()) -> {ok, pid()}.
 connect(Pid, IP, Port) when is_integer(Port) ->
     gen_server:call(Pid, {connect, IP, Port}).
 
-
+%%--------------------------------------------------------------------
+%% @doc
+%% Disconnect
+%% @end
+%%--------------------------------------------------------------------
+-spec disconnect(pid()) -> ok.
+disconnect(Pid) when is_pid(Pid) ->
+    gen_server:cast(Pid, diconnect).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -105,11 +111,10 @@ init([Module]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call({connect, IP, Port}, From, #state{connector=Connect_socket}=State) ->
+handle_call({connect, IP, Port}, _From, #state{connector=Connect_socket}=State) ->
     Opts = [{active, once} | ?SCTP_OPTS],
     ok = gen_sctp:connect_init(Connect_socket, IP, Port, Opts),
-    Ref = make_ref(), 
-    {reply, Ref, State#state{connection_ref=Ref, supper=From}};
+    {reply, ok, State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -124,6 +129,11 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast(disconnect, #state{handler=Pid} = State) when is_pid(Pid) ->
+    exit(Pid, ok),
+    {stop, normal, State#state{handler=undefined}};
+handle_cast(disconnect, State) ->    
+    {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -139,19 +149,16 @@ handle_cast(_Msg, State) ->
 %%--------------------------------------------------------------------
 handle_info({sctp, _Sock, _RA, _RP,
              {[], #sctp_assoc_change{state = comm_up,
-                                     outbound_streams = OS,
-                                     inbound_streams = IS,
                                      assoc_id = AssocId}}},
-            #state{connector=ConnectorSock, module=Module, 
-                   supper=SPid, connection_ref=Ref} = State) ->
+            #state{connector=ConnectorSock, module=Module} = State) ->
     try
-        {ok, CliSocket} = gen_sctp:peeloff(ConnectorSock, AssocId),
+        %% {ok, CliSocket} = gen_sctp:peeloff(ConnectorSock, AssocId),
         {ok, Pid} = sctp_client_app:start_server_peer(),
+        link(Pid),
+        gen_sctp:controlling_process(ConnectorSock, Pid),
         %% Instruct the new FSM that it owns the socket.
-        Module:set_socket(Pid, CliSocket, AssocId),
-        timer:sleep(2000),
-        %% SPid ! {comm_up, Ref, Pid},
-        {stop, normal, State}
+        Module:set_socket(Pid, ConnectorSock, AssocId),
+        {noreply, State#state{assoc_id=AssocId, handler = Pid}}
     catch exit:Why ->
         ?ERROR("Error in async connect: ~p.\n", [Why]),
         {stop, Why, State}
@@ -159,9 +166,20 @@ handle_info({sctp, _Sock, _RA, _RP,
 handle_info({sctp, _Sock, _RA, _RP,
              {[], #sctp_assoc_change{state = cant_assoc,
                                      assoc_id = AssocId}}},
-            #state{connector=ConnectorSock, module=Module} = State) ->
-    ?WARNING("Can't Assoc: ~p.\n", [AssocId]),
+            State) ->
+    ?WARNING("~p Can't Assoc: ~p.\n", [self(),AssocId]),
     {stop, ok, State};                          %FIXME: add retry
+
+%% peer handler crached and need to be restarted
+handle_info({'EXIT',Pid,shutdown}, #state{handler=Pid} = State) when is_pid(Pid)->
+    ?WARNING("Peer handler exited: ~p in state: ~p.\n", [Pid, State]),
+    %% gen_sctp:controlling_process(State#state.connector, self()),
+    %% %% FIXME: reconnect
+    {noreply, State, ?RECONNECT_TIMEOUT};
+%% peer terminated on disconnect
+handle_info({'EXIT',Pid,shutdown}, State) ->
+    ?WARNING("Peer handler terminated: ~p in state: ~p.\n", [Pid, State]),
+    {noreply, State};
 handle_info(_Info, State) ->
     ?ERROR("Unhandled: ~p in state: ~p.\n", [_Info, State]),
     {noreply, State}.
@@ -177,7 +195,7 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, State) ->
+terminate(_Reason, State) ->   
     gen_sctp:close(State#state.connector),
     ok.
 

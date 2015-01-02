@@ -126,6 +126,12 @@ handle_info({sctp, _CliSock, _FromIP, _FromPort,
     %% Flow control: enable forwarding of next SCTP message
     inet:setopts(Socket, [{active, once}]),
     ?MODULE:StateName({data, Bin}, StateData);
+handle_info({sctp, _Sock, _RA, _RP,
+             {[], #sctp_assoc_change{state = comm_lost}}},
+            _StateName,
+            #state{socket=_Socket, addr=Addr} = StateData) ->
+    ?INFO("~p Communication ~p lost.\n", [self(), Addr]),
+    {stop, normal, StateData};
 handle_info({sctp, _CliSock, _FromIP, _FromPort,
             {_, #sctp_shutdown_event{assoc_id = _Id}}},
             _StateName,

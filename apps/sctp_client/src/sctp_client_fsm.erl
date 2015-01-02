@@ -31,8 +31,8 @@
 ]).
 
 -record(state, {
-          socket,    % client socket
-          assoc,
+          socket:: gen_sctp:sctp_socket(),    % client socket
+          assoc_id,
           addr       % client address
          }).
 
@@ -84,20 +84,20 @@ init([]) ->
 %%-------------------------------------------------------------------------
 'WAIT_FOR_SOCKET'({socket_ready, Socket, AssocId}, State) when is_port(Socket) ->
     % Now we own the socket
-    ?INFO("Now we own the socket: ~p",[Socket]),
+    ?INFO("Now we own the server peer socket: ~p",[Socket]),
     inet:setopts(Socket, [{active, once}, binary]),
     IP={},
     gen_sctp:send(Socket, AssocId, 0, <<"hello">>),
-    inet:setopts(Socket, [{active, once}, binary]),
+    %% inet:setopts(Socket, [{active, once}, binary]),
 
-    {next_state, 'WAIT_FOR_DATA', State#state{socket=Socket, assoc=AssocId, addr=IP}, ?TIMEOUT};
+    {next_state, 'WAIT_FOR_DATA', State#state{socket=Socket, assoc_id=AssocId, addr=IP}, ?TIMEOUT};
 'WAIT_FOR_SOCKET'(Other, State) ->
     ?ERROR("State: 'WAIT_FOR_SOCKET'. Unexpected message: ~p\n", [Other]),
     %% Allow to receive async messages
     {next_state, 'WAIT_FOR_SOCKET', State}.
 
 %% Notification event coming from client
-'WAIT_FOR_DATA'({data, Data}, #state{socket=S, assoc=A} = State) ->
+'WAIT_FOR_DATA'({data, Data}, #state{socket=S, assoc_id=A} = State) ->
     ok = gen_sctp:send(S, A, 0, Data),
     {next_state, 'WAIT_FOR_DATA', State, ?TIMEOUT};
 
@@ -130,6 +130,12 @@ handle_info({sctp, _CliSock, _FromIP, _FromPort,
     %% Flow control: enable forwarding of next SCTP message
     inet:setopts(Socket, [{active, once}]),
     ?MODULE:StateName({data, Bin}, StateData);
+handle_info({sctp, _Sock, _RA, _RP,
+             {[], #sctp_assoc_change{state = comm_lost}}},
+            _StateName,
+            #state{socket=_Socket, addr=Addr} = StateData) ->
+    ?INFO("~p Communication ~p lost.\n", [self(), Addr]),
+    {stop, normal, StateData};    
 handle_info({sctp, _CliSock, _FromIP, _FromPort,
             {_, #sctp_shutdown_event{assoc_id = _Id}}},
             _StateName,
@@ -152,8 +158,9 @@ handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_paddr_change{}}}, StateName, State
 %% Returns: any
 %% @private
 %%-------------------------------------------------------------------------
-terminate(_Reason, _StateName, #state{socket=Socket}) ->
-    (catch gen_sctp:close(Socket)), 
+terminate(_Reason, _StateName, _StateData) ->
+    %% gen_sctp:eof(StateData#state.socket,StateData#state.assoc_id),
+    %% (catch gen_sctp:close(StateData#state.socket)), 
     ok.
 
 %%-------------------------------------------------------------------------
