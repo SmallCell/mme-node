@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 19 Dec 2014 by vlad <lib.aca55a@gmail.com>
 %%%-------------------------------------------------------------------
--module(sctp_echo_fsm).
+-module(sctp_client_fsm).
 
 -behaviour(gen_fsm).
 
@@ -18,6 +18,7 @@
 
 -include_lib("kernel/include/inet.hrl").
 -include_lib("kernel/include/inet_sctp.hrl").
+
 -include_lib("mme/include/mme_logger.hrl").
 
 %% -define(NOTRACE,true).
@@ -85,7 +86,10 @@ init([]) ->
     % Now we own the socket
     ?INFO("Now we own the socket: ~p",[Socket]),
     inet:setopts(Socket, [{active, once}, binary]),
-    {ok, {IP, _Port}} = inet:peername(Socket),
+    IP={},
+    gen_sctp:send(Socket, AssocId, 0, <<"hello">>),
+    inet:setopts(Socket, [{active, once}, binary]),
+
     {next_state, 'WAIT_FOR_DATA', State#state{socket=Socket, assoc=AssocId, addr=IP}, ?TIMEOUT};
 'WAIT_FOR_SOCKET'(Other, State) ->
     ?ERROR("State: 'WAIT_FOR_SOCKET'. Unexpected message: ~p\n", [Other]),
@@ -135,11 +139,11 @@ handle_info({sctp, _CliSock, _FromIP, _FromPort,
 handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_pdapi_event{}}}, StateName, StateData) ->
     {next_state, StateName, StateData};
 handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_paddr_change{}}}, StateName, StateData) ->
-    {next_state, StateName, StateData};
+    {next_state, StateName, StateData}.
 
-handle_info(Data, StateName, StateData) ->
-    ?ERROR("handle_info. Unexpected message: ~p\n", [Data]),
-    {noreply, StateName, StateData}.
+%% handle_info(Data, StateName, StateData) ->
+%%     ?ERROR("handle_info. Unexpected message: ~p\n", [Data]),
+%%     {noreply, StateName, StateData}.
 
     
 %%-------------------------------------------------------------------------

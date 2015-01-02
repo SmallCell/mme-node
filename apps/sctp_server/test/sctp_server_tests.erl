@@ -62,9 +62,9 @@ teardown(TracerPid) ->
     exit(TracerPid, ok),
     ok.
 
-
 ensure_started(App) ->
     case application:start(App) of
         ok -> ok;
         {error, {already_started, App}} -> ok
     end.
+ 

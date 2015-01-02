@@ -6,8 +6,8 @@
 %%% @end
 %%% Created : 19 Dec 2014 by vlad <lib.aca55a@gmail.com>
 %%%-------------------------------------------------------------------
--module(sctp_client_sup).
-
+-module(sctp_server_peer_sup).
+ 
 -behaviour(supervisor).
 
 %% API
@@ -20,7 +20,7 @@
 
 -define(MAX_RESTART,    5).
 -define(MAX_TIME,      60).
-
+ 
 start_link(Module) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, [Module]).
 
@@ -28,7 +28,7 @@ init([Module]) ->
     {ok,
         {_SupFlags = {simple_one_for_one, ?MAX_RESTART, ?MAX_TIME},
             [
-              % SCTP Client
+              % SCTP Server peer
               {   undefined,                               % Id       = internal id
                   {Module,start_link,[]},                  % StartFun = {M, F, A}
                   temporary,                               % Restart  = permanent | transient | temporary

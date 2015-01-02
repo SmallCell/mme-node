@@ -11,17 +11,16 @@
 -behaviour(application).
 
 %% Internal API
--export([start_client/0]).
+-export([start_client_peer/0]).
 
 %% Application callbacks
 -export([start/2, stop/1]).
 
 -define(DEF_PORT, 3333).
 
-%% A startup function for spawning new client connection handling FSM.
-%% To be called by the SCTP listener process.
-start_client() ->
-    supervisor:start_child(sctp_client_sup, []).
+%% To be called by the SCTP connector process.
+start_client_peer() ->
+    supervisor:start_child(sctp_client_peer_sup, []).
 
 %% ===================================================================
 %% Application callbacks

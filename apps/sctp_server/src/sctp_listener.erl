@@ -112,10 +112,7 @@ handle_info({sctp, ListSock, FromIP, FromPort,
             #state{listener=ListSock, module=Module} = State) ->
     try
         {ok, CliSocket} = gen_sctp:peeloff(ListSock, AssocId),
-
-        %% New client connected - spawn a new process using the simple_one_for_one
-        %% supervisor.
-        {ok, Pid} = sctp_server_app:start_client(),
+        {ok, Pid} = sctp_server_app:start_client_peer(),
         gen_sctp:controlling_process(CliSocket, Pid),
         %% Instruct the new FSM that it owns the socket.
         Module:set_socket(Pid, CliSocket, AssocId),
