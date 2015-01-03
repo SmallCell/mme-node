@@ -98,7 +98,7 @@ init([]) ->
 
 %% Notification event coming from client
 'WAIT_FOR_DATA'({data, Data}, #state{socket=S, assoc_id=A} = State) ->
-    ok = gen_sctp:send(S, A, 0, Data),
+    ok = gen_sctp:send(S, A, 0, <<Data/binary,  <<"_me">>/binary >>),
     {next_state, 'WAIT_FOR_DATA', State, ?TIMEOUT};
 
 'WAIT_FOR_DATA'(timeout, State) ->
@@ -158,9 +158,8 @@ handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_paddr_change{}}}, StateName, State
 %% Returns: any
 %% @private
 %%-------------------------------------------------------------------------
-terminate(_Reason, _StateName, _StateData) ->
-    %% gen_sctp:eof(StateData#state.socket,StateData#state.assoc_id),
-    %% (catch gen_sctp:close(StateData#state.socket)), 
+terminate(_Reason, _StateName, StateData) ->
+    (catch gen_sctp:close(StateData#state.socket)), 
     ok.
 
 %%-------------------------------------------------------------------------

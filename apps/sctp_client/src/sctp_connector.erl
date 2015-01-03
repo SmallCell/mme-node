@@ -180,8 +180,12 @@ handle_info({'EXIT',Pid,shutdown}, #state{handler=Pid} = State) when is_pid(Pid)
 handle_info({'EXIT',Pid,shutdown}, State) ->
     ?WARNING("Peer handler terminated: ~p in state: ~p.\n", [Pid, State]),
     {noreply, State};
+handle_info({'EXIT',Pid,shutdown}, State) ->
+    ?WARNING("Peer handler terminated: ~p in state: ~p.\n", [Pid, State]),
+    {noreply, State};
+
 handle_info(_Info, State) ->
-    ?ERROR("Unhandled: ~p in state: ~p.\n", [_Info, State]),
+    ?ERROR(">> Unhandled: ~p in state: ~p.\n", [_Info, State]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------

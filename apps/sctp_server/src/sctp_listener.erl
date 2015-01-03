@@ -33,7 +33,6 @@
 
 
 -record(state, {
-          ref      :: reference(),
           listener :: gen_sctp:sctp_socket(),       % Listening socket
           module   :: atom()       % FSM handling module
          }).
@@ -73,7 +72,9 @@ init([Port, Module]) ->
             {ok, #state{listener = Listen_socket,
                         module   = Module}};
         {error, Reason} ->
-            {stop, Reason}
+            {stop, Reason};
+        Val ->
+            ?ERROR(">> open: ~p", [Val])
     end.
 
 %%-------------------------------------------------------------------------
