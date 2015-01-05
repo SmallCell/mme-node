@@ -130,7 +130,8 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(disconnect, #state{handler=Pid} = State) when is_pid(Pid) ->
-    exit(Pid, ok),
+    ?WARNING("disconnect:  ~p",[State]),
+%    exit(Pid, ok),
     {stop, normal, State#state{handler=undefined}};
 handle_cast(disconnect, State) ->    
     {stop, normal, State};
@@ -158,6 +159,7 @@ handle_info({sctp, _Sock, _RA, _RP,
         gen_sctp:controlling_process(ConnectorSock, Pid),
         %% Instruct the new FSM that it owns the socket.
         Module:set_socket(Pid, ConnectorSock, AssocId),
+
         {noreply, State#state{assoc_id=AssocId, handler = Pid}}
     catch exit:Why ->
         ?ERROR("Error in async connect: ~p.\n", [Why]),
@@ -180,9 +182,9 @@ handle_info({'EXIT',Pid,shutdown}, #state{handler=Pid} = State) when is_pid(Pid)
 handle_info({'EXIT',Pid,shutdown}, State) ->
     ?WARNING("Peer handler terminated: ~p in state: ~p.\n", [Pid, State]),
     {noreply, State};
-handle_info({'EXIT',Pid,shutdown}, State) ->
-    ?WARNING("Peer handler terminated: ~p in state: ~p.\n", [Pid, State]),
-    {noreply, State};
+%% handle_info({'EXIT',Pid,shutdown}, State) ->
+%%     ?WARNING("Peer handler terminated: ~p in state: ~p.\n", [Pid, State]),
+%%     {noreply, State};
 
 handle_info(_Info, State) ->
     ?ERROR(">> Unhandled: ~p in state: ~p.\n", [_Info, State]),

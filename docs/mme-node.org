@@ -23,9 +23,6 @@
     A DownLink Traffic Flow Template (DL TFT) is the set of downlink packet filters in a TFT
     P-GW S5/S8 Bearer: DL-TFT -> S5/S8-TEID 
 
-
-
-
 * MME Mobility-Management Entity
   - Track UE's via tracking area
   - Call processing

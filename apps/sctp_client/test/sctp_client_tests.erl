@@ -6,20 +6,61 @@
 %%% Created : 19 Dec 2014 by vlad <lib.aca55a@gmail.com>
 
 -module(sctp_client_tests).
- 
+
 -include_lib("kernel/include/inet.hrl").
 -include_lib("kernel/include/inet_sctp.hrl").
 
+-include_lib("eunit_fsm/include/eunit_fsm.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(DEF_HOST, {127,0,0,1}).
 -define(DEF_PORT,    3333).
 
-
-sctp_client_setup_test_() ->
+fsm_tradepost_test_() ->
+   {timeout, 10000,
+    {setup,
+     fun setup/0,
+     fun teardown/1,
+     [
+      ?_fsm_test(whereis(sctp_listener), "Start  server and client",
+                 [
+                  {call, application, start, [sctp_server], ok}
+                 ,{srvdata, match, [fun erlang:is_port/1 ,sctp_echo_fsm]}
+                 ,{call, application, start, [sctp_client], ok}
+                 ]),  
+      {"Setup connector", 
+       {setup,
+        fun () -> element(2, sctp_client_app:start_connector()) end,
+        fun (_) -> ok end,
+        {with, 
+         [?_with_fsm_test("Connect/disconnect",
+                          [
+                           {srvdata, match, [fun erlang:is_port/1,undefined,undefined,sctp_client_fsm]}
+                          ,{callwith, sctp_connector, connect, [?DEF_HOST, ?DEF_PORT], ok}
+                          ,{sleep, 1000}
+                          ,{srvdata, match, [fun erlang:is_port/1,any,fun erlang:is_pid/1,sctp_client_fsm]} 
+                          ,{srvdata, show}
+                          ,{callwith, sctp_connector, disconnect, [], ok}
+                          ,{sleep, 500}
+                          ])
+         ]}
+       }},
+      ?_test(?assertEqual(proplists:lookup(active, supervisor:count_children(sctp_client_peer_sup)), 
+                          {active, 0})),
+      ?_fsm_test(whereis(sctp_client_peer_sup), "Stop client server", 
+                 [
+                  {call, application, stop, [sctp_client], ok}
+                  ,{srvdata, show}
+                  %% {call, application, start, [sctp_client], ok}
+                 ])
+     ]
+    }}.
+ 
+ 
+sctp_client_setup_test_no() ->
    {timeout, 3000,
      {setup,
-      fun setup/0, 
+      fun setup/0,
       fun teardown/1,
          [{"Start/stop SCTP client common logic", fun logic/0}]}}.
 
@@ -27,9 +68,9 @@ sctp_client_setup_test_() ->
 logic() ->
     ?assertEqual(ok, application:start(sctp_server)),
     case get_status(whereis(sctp_listener), "State") of
-        {state,Port,sctp_echo_fsm} when is_port(Port) -> 
+        {state,Port,sctp_echo_fsm} when is_port(Port) ->
             ?assert(is_port(Port))
-    end, 
+    end,
     ?assertEqual(ok, application:start(sctp_client)),
 
     {ok, ConnPid} = sctp_client_app:start_connector(),
@@ -37,7 +78,7 @@ logic() ->
         {state, _,undefined,undefined,sctp_client_fsm} -> ok
     end,
     ok = sctp_connector:connect(ConnPid, ?DEF_HOST, ?DEF_PORT),
-    timer:sleep(1000), 
+    timer:sleep(1000),
     HndPid = case get_status(ConnPid, "State") of
                  {state,_,_,Val,sctp_client_fsm} -> Val
              end,
@@ -47,21 +88,21 @@ logic() ->
 
     %% ?assertEqual(ok, application:start(sctp_client)),
     %% Ref = sctp_connector:connect(Pid, ?DEF_HOST, ?DEF_PORT),
-    timer:sleep(1000), 
-    application:stop(sctp_server), 
-    ok.  
-       
-   
+    timer:sleep(1000),
+    application:stop(sctp_server),
+    ok.
+
+
 setup() ->
-    ensure_started(sasl), 
+    ensure_started(sasl),
     ensure_started(compiler),
-    ensure_started(syntax_tools), 
+    ensure_started(syntax_tools),
     ensure_started(lager),
     ok.
-    
+
 teardown(_) ->
-    application:stop(sctp_client),
-    application:stop(sctp_server),
+    catch application:stop(sctp_client),
+    catch application:stop(sctp_server),
     ok.
 
 get_status(Pid, Which) ->
