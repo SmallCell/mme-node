@@ -43,9 +43,9 @@ fsm_tradepost_test_() ->
                           ,{srvdata, show}
                           ,{callwith, sctp_connector, disconnect, [], ok}
                           ,{sleep, 500}
-                          ])
-         ]}
-       }},
+                          ])  
+         ]} 
+       }}, 
       ?_test(?assertEqual(proplists:lookup(active, supervisor:count_children(sctp_client_peer_sup)), 
                           {active, 0})),
       ?_fsm_test(whereis(sctp_client_peer_sup), "Stop client server", 
