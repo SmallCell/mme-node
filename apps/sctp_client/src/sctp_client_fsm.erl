@@ -98,7 +98,7 @@ init([]) ->
 
 %% Notification event coming from client
 'WAIT_FOR_DATA'({data, Data}, #state{socket=S, assoc_id=A} = State) ->
-    ok = gen_sctp:send(S, A, 0, <<Data/binary,  <<"_me">>/binary >>),
+    ok = gen_sctp:send(S, A, 0, Data),
     {next_state, 'WAIT_FOR_DATA', State, ?TIMEOUT};
 
 'WAIT_FOR_DATA'(timeout, State) ->
@@ -143,14 +143,14 @@ handle_info({sctp, _CliSock, _FromIP, _FromPort,
     ?INFO("~p Client ~p disconnected.\n", [self(), Addr]),
     {stop, normal, StateData};
 handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_pdapi_event{}}}, StateName, StateData) ->
+    inet:setopts(StateData#state.socket, [{active, once}, binary]),
     {next_state, StateName, StateData};
 handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_paddr_change{}}}, StateName, StateData) ->
-    {next_state, StateName, StateData}.
-
-%% handle_info(Data, StateName, StateData) ->
-%%     ?ERROR("handle_info. Unexpected message: ~p\n", [Data]),
-%%     {noreply, StateName, StateData}.
-
+    inet:setopts(StateData#state.socket, [{active, once}, binary]),
+    {next_state, StateName, StateData};
+handle_info(Data, StateName, StateData) ->
+    ?ERROR("Client handle_info. Unexpected message: ~p\n", [Data]),
+    {noreply, StateName, StateData}.
     
 %%-------------------------------------------------------------------------
 %% Func: terminate/3

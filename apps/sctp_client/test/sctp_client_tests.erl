@@ -11,6 +11,7 @@
 -include_lib("kernel/include/inet_sctp.hrl").
 
 -include_lib("eunit_fsm/include/eunit_fsm.hrl").
+-include_lib("eunit_fsm/include/eunit_seq_trace.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(DEF_HOST, {127,0,0,1}).
@@ -33,7 +34,7 @@ fsm_tradepost_test_() ->
         fun () -> element(2, sctp_client_app:start_connector()) end,
         fun (_) -> ok end,
         {with, 
-         [?_with_fsm_test("Connect/disconnect",
+         [?_with_fsm_test("Connect/disconnect", 
                           [
                            {srvdata, match, [fun erlang:is_port/1,undefined,undefined,sctp_client_fsm]}
                           ,{callwith, sctp_connector, connect, [?DEF_HOST, ?DEF_PORT], ok}
@@ -64,7 +65,7 @@ sctp_client_setup_test_no() ->
       fun teardown/1,
          [{"Start/stop SCTP client common logic", fun logic/0}]}}.
 
-
+ 
 logic() ->
     ?assertEqual(ok, application:start(sctp_server)),
     case get_status(whereis(sctp_listener), "State") of
@@ -98,11 +99,18 @@ setup() ->
     ensure_started(compiler),
     ensure_started(syntax_tools),
     ensure_started(lager),
-    ok.
+    %% SPAWN TRACES
+    Pid = spawn(eunit_seq_trace,tracer,[]),
+    seq_trace:set_system_tracer(Pid), % set Pid as the system tracer
+    ?testTraceItit(44, ['receive', print, timestamp, send]),
+    ?testTracePrint(44,"sctp_client_tests setup"),
+    Pid.
 
-teardown(_) ->
+teardown(Pid) ->
     catch application:stop(sctp_client),
     catch application:stop(sctp_server),
+    ?testTracePrint(44,"sctp_client_tests teardown"),
+    exit(Pid, ok),
     ok.
 
 get_status(Pid, Which) ->

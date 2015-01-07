@@ -129,22 +129,24 @@ handle_info({sctp, _CliSock, _FromIP, _FromPort,
 handle_info({sctp, _Sock, _RA, _RP,
              {[], #sctp_assoc_change{state = comm_lost}}},
             _StateName,
-            #state{socket=_Socket, addr=Addr} = StateData) ->
+            #state{socket=Socket, addr=Addr} = StateData) ->
     ?INFO("~p Communication ~p lost.\n", [self(), Addr]),
     {stop, normal, StateData};
 handle_info({sctp, _CliSock, _FromIP, _FromPort,
             {_, #sctp_shutdown_event{assoc_id = _Id}}},
             _StateName,
-            #state{socket=_Socket, addr=Addr} = StateData) ->
+            #state{socket=Socket, addr=Addr} = StateData) ->
     ?INFO("~p Client ~p disconnected.\n", [self(), Addr]),
     {stop, normal, StateData};
 handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_pdapi_event{}}}, StateName, StateData) ->
+    inet:setopts(StateData#state.socket, [{active, once}, binary]),
     {next_state, StateName, StateData};
 handle_info({sctp, _Sock, _RA, _RP, {_, #sctp_paddr_change{}}}, StateName, StateData) ->
+    inet:setopts(StateData#state.socket, [{active, once}, binary]),
     {next_state, StateName, StateData};
-
 handle_info(Data, StateName, StateData) ->
     ?ERROR("handle_info. Unexpected message: ~p\n", [Data]),
+    inet:setopts(StateData#state.socket, [{active, once}, binary]),
     {noreply, StateName, StateData}.
 
     
