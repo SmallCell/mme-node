@@ -3,7 +3,7 @@ APP := mme
 VSN = $(shell sed -n 's/.*{vsn,.*"\(.*\)"}.*/\1/p' apps/$(APP)/$(APP).app.src)
 
 
-REBAR=./rebar
+REBAR=rebar
 
 .PHONY: deps docs
 
