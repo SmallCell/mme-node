@@ -10,3 +10,4 @@ docs/*.tex
 logs
 ct_run*
 ct_log_cache*
+ebin/
